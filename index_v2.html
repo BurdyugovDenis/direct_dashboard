@@ -1,0 +1,1370 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Директ — Multi-Account Analytics</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@300;400;600;800&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg: #07080d;
+  --surface: #0e1018;
+  --surface2: #151820;
+  --border: #1e2230;
+  --accent: #e8ff47;
+  --accent2: #47c5ff;
+  --accent3: #ff6b47;
+  --text: #f0f2ff;
+  --muted: #5a607a;
+  --success: #47ffb3;
+  --danger: #ff4747;
+  --warning: #ffb347;
+  --font-d: 'Unbounded', sans-serif;
+  --font-m: 'JetBrains Mono', monospace;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-m);
+  font-size: 13px;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+body::before {
+  content: '';
+  position: fixed; inset: 0;
+  background-image: linear-gradient(var(--border) 1px, transparent 1px), linear-gradient(90deg, var(--border) 1px, transparent 1px);
+  background-size: 40px 40px;
+  opacity: 0.35;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* ── SETTINGS ── */
+#settings-overlay {
+  position: fixed; inset: 0;
+  background: rgba(7,8,13,0.92);
+  backdrop-filter: blur(12px);
+  z-index: 200;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 24px 16px;
+  overflow-y: auto;
+}
+.sp {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-top: 2px solid var(--accent);
+  padding: 36px;
+  width: 100%; max-width: 760px;
+  position: relative;
+}
+.sp h2 { font-family: var(--font-d); font-size: 16px; font-weight: 800; color: var(--accent); margin-bottom: 6px; }
+.sp .sub { font-size: 11px; color: var(--muted); margin-bottom: 28px; line-height: 1.7; }
+
+/* Account cards */
+.accounts-list { display: flex; flex-direction: column; gap: 12px; margin-bottom: 20px; }
+.acc-card {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  padding: 16px;
+  position: relative;
+}
+.acc-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+.acc-num {
+  font-family: var(--font-d);
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--accent);
+  letter-spacing: 1px;
+}
+.acc-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.acc-grid .full { grid-column: 1 / -1; }
+.fg { display: flex; flex-direction: column; gap: 5px; }
+.fg label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; }
+.fg input, .fg textarea {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-family: var(--font-m);
+  font-size: 12px;
+  padding: 8px 12px;
+  outline: none;
+  width: 100%;
+}
+.fg input:focus, .fg textarea:focus { border-color: var(--accent); }
+.fg textarea { min-height: 60px; resize: vertical; }
+.fg .hint { font-size: 10px; color: var(--muted); line-height: 1.5; }
+
+.btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: var(--accent); color: #07080d;
+  border: none;
+  font-family: var(--font-d); font-size: 10px; font-weight: 600;
+  letter-spacing: 0.5px; padding: 10px 20px;
+  cursor: pointer; transition: all 0.15s;
+  text-transform: uppercase;
+}
+.btn:hover { background: #fff; }
+.btn.s { background: transparent; color: var(--muted); border: 1px solid var(--border); }
+.btn.s:hover { color: var(--text); border-color: var(--muted); background: transparent; }
+.btn.d { background: rgba(255,71,71,0.12); color: var(--danger); border: 1px solid rgba(255,71,71,0.2); }
+.btn.d:hover { background: rgba(255,71,71,0.2); }
+.btn-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+
+.global-settings {
+  border: 1px solid var(--border);
+  padding: 16px;
+  margin-bottom: 20px;
+  background: var(--bg);
+}
+.global-settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+/* ── APP ── */
+#app { position: relative; z-index: 1; display: none; flex-direction: column; min-height: 100vh; }
+
+header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 28px;
+  border-bottom: 1px solid var(--border);
+  background: rgba(14,16,24,0.85);
+  backdrop-filter: blur(12px);
+  position: sticky; top: 0; z-index: 10;
+  gap: 12px; flex-wrap: wrap;
+}
+.logo { font-family: var(--font-d); font-size: 13px; font-weight: 800; letter-spacing: -0.5px; }
+.logo span { color: var(--accent); }
+.header-right { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+
+.ibtn {
+  background: none; border: 1px solid var(--border); color: var(--muted);
+  cursor: pointer; padding: 5px 12px;
+  font-family: var(--font-m); font-size: 11px;
+  transition: all 0.15s;
+}
+.ibtn:hover { border-color: var(--accent); color: var(--accent); }
+
+.acc-badges { display: flex; gap: 6px; flex-wrap: wrap; }
+.acc-badge {
+  font-size: 10px; padding: 3px 10px;
+  border: 1px solid var(--border);
+  cursor: pointer;
+  transition: all 0.15s;
+  font-family: var(--font-m);
+}
+.acc-badge:hover { border-color: var(--accent2); color: var(--accent2); }
+.acc-badge.active { background: var(--accent2); border-color: var(--accent2); color: #07080d; font-weight: 600; }
+.acc-badge.all { background: var(--accent); border-color: var(--accent); color: #07080d; font-weight: 600; }
+
+/* ── TOOLBAR ── */
+.toolbar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 28px;
+  border-bottom: 1px solid var(--border);
+  flex-wrap: wrap; gap: 10px;
+}
+.period-selector { display: flex; gap: 2px; }
+.pb {
+  background: none; border: 1px solid var(--border); color: var(--muted);
+  font-family: var(--font-m); font-size: 11px; padding: 5px 12px;
+  cursor: pointer; transition: all 0.15s;
+  text-transform: uppercase; letter-spacing: 0.5px;
+}
+.pb:hover { border-color: var(--accent2); color: var(--accent2); }
+.pb.active { background: var(--accent); border-color: var(--accent); color: #07080d; font-weight: 600; }
+
+.date-range { display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--muted); }
+.date-range input[type="date"] {
+  background: var(--surface2); border: 1px solid var(--border);
+  color: var(--text); font-family: var(--font-m); font-size: 11px; padding: 5px 8px; outline: none;
+}
+.date-range input[type="date"]:focus { border-color: var(--accent); }
+
+/* ── TABS ── */
+.view-tabs {
+  display: flex; gap: 0;
+  padding: 0 28px;
+  border-bottom: 1px solid var(--border);
+  background: rgba(14,16,24,0.5);
+}
+.tab-btn {
+  background: none; border: none; border-bottom: 2px solid transparent;
+  color: var(--muted); font-family: var(--font-d); font-size: 10px; font-weight: 600;
+  letter-spacing: 0.5px; padding: 12px 20px;
+  cursor: pointer; transition: all 0.15s;
+  text-transform: uppercase;
+}
+.tab-btn:hover { color: var(--text); }
+.tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+/* ── MAIN ── */
+main { padding: 28px; display: flex; flex-direction: column; gap: 24px; }
+
+/* ── KPI ── */
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 1px; border: 1px solid var(--border); background: var(--border);
+}
+.kpi-card {
+  background: var(--surface); padding: 20px;
+  position: relative; overflow: hidden; transition: background 0.2s;
+}
+.kpi-card::after {
+  content: ''; position: absolute; bottom: 0; left: 0; right: 0;
+  height: 2px; background: var(--accent); transform: scaleX(0); transition: transform 0.3s;
+}
+.kpi-card:hover::after { transform: scaleX(1); }
+.kpi-card:hover { background: var(--surface2); }
+.kpi-label { font-size: 9px; font-weight: 500; color: var(--muted); text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 10px; }
+.kpi-value { font-family: var(--font-d); font-size: 24px; font-weight: 800; letter-spacing: -1px; line-height: 1; margin-bottom: 6px; }
+.kpi-sub { font-size: 10px; color: var(--muted); }
+.c-acc { color: var(--accent); }
+.c-acc2 { color: var(--accent2); }
+.c-acc3 { color: var(--accent3); }
+.c-suc { color: var(--success); }
+
+/* ── SECTION CARD ── */
+.card {
+  background: var(--surface); border: 1px solid var(--border); padding: 22px;
+  position: relative;
+}
+.card-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 18px; }
+.card-title { font-family: var(--font-d); font-size: 11px; font-weight: 600; letter-spacing: -0.3px; }
+.card-sub { font-size: 10px; color: var(--muted); margin-top: 2px; }
+.card-tag { font-size: 9px; font-weight: 600; padding: 3px 8px; text-transform: uppercase; letter-spacing: 1px; }
+.tag-y { background: rgba(232,255,71,0.08); color: var(--accent); border: 1px solid rgba(232,255,71,0.15); }
+.tag-b { background: rgba(71,197,255,0.08); color: var(--accent2); border: 1px solid rgba(71,197,255,0.15); }
+.tag-o { background: rgba(255,107,71,0.08); color: var(--accent3); border: 1px solid rgba(255,107,71,0.15); }
+.tag-g { background: rgba(71,255,179,0.08); color: var(--success); border: 1px solid rgba(71,255,179,0.15); }
+
+.chart-wrap { position: relative; height: 200px; }
+.charts-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+
+/* ── TABLE ── */
+.tbl-wrap { overflow-x: auto; }
+.dtbl { width: 100%; border-collapse: collapse; }
+.dtbl th {
+  background: var(--bg); padding: 9px 14px;
+  text-align: left; font-size: 9px; font-weight: 500;
+  color: var(--muted); text-transform: uppercase; letter-spacing: 1.5px;
+  border-bottom: 1px solid var(--border); white-space: nowrap;
+}
+.dtbl td { padding: 11px 14px; font-size: 12px; border-bottom: 1px solid rgba(30,34,48,0.5); white-space: nowrap; }
+.dtbl tr:hover td { background: var(--surface2); }
+.dtbl tr:last-child td { border-bottom: none; }
+.dtbl td.n, .dtbl th.n { text-align: right; }
+.dtbl td.acc-name { font-family: var(--font-d); font-size: 11px; font-weight: 600; color: var(--text); }
+.dtbl td.clickable { cursor: pointer; }
+.dtbl td.clickable:hover { color: var(--accent2); }
+.dtbl .total-row td { background: rgba(232,255,71,0.04); font-weight: 600; border-top: 1px solid var(--border); }
+
+/* badges in table */
+.status-ok { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--success); box-shadow: 0 0 6px var(--success); }
+.status-err { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--danger); }
+.status-load { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--warning); animation: blink 1s infinite; }
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+/* ── DRILLDOWN ── */
+.drilldown-header {
+  display: flex; align-items: center; gap: 12px; margin-bottom: 20px;
+}
+.drilldown-back {
+  background: none; border: 1px solid var(--border); color: var(--muted);
+  padding: 5px 12px; cursor: pointer; font-family: var(--font-m); font-size: 11px;
+  transition: all 0.15s;
+}
+.drilldown-back:hover { color: var(--accent); border-color: var(--accent); }
+.drilldown-title { font-family: var(--font-d); font-size: 14px; font-weight: 800; }
+
+/* ── LOADING / ERROR ── */
+.loader-bar-wrap { position: absolute; inset: 0; background: rgba(7,8,13,0.7); display: flex; align-items: center; justify-content: center; z-index: 5; backdrop-filter: blur(4px); }
+.loader-bar-inner { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.lb { width: 100px; height: 2px; background: var(--border); overflow: hidden; position: relative; }
+.lb::after { content: ''; position: absolute; left: -40%; width: 40%; height: 100%; background: var(--accent); animation: ld 1s ease-in-out infinite; }
+@keyframes ld { to { left: 140%; } }
+.lbt { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; }
+
+.err-bar {
+  background: rgba(255,71,71,0.08); border: 1px solid rgba(255,71,71,0.25);
+  color: var(--danger); padding: 10px 16px; font-size: 12px;
+  display: none; align-items: center; gap: 8px; margin-bottom: 16px;
+}
+.err-bar.show { display: flex; }
+
+.empty { text-align: center; padding: 48px 20px; color: var(--muted); font-size: 12px; line-height: 1.9; }
+
+/* Export dropdown */
+.export-wrap { position: relative; display: inline-block; }
+.export-menu {
+  position: absolute; right: 0; top: 100%; margin-top: 4px;
+  background: var(--surface); border: 1px solid var(--border);
+  min-width: 200px; z-index: 50; display: none; flex-direction: column;
+}
+.export-menu.open { display: flex; }
+.export-item { padding: 9px 16px; font-size: 11px; cursor: pointer; transition: background 0.15s; }
+.export-item:hover { background: var(--surface2); color: var(--accent); }
+
+@media (max-width: 768px) {
+  main { padding: 14px; }
+  .charts-2 { grid-template-columns: 1fr; }
+  header, .toolbar, .view-tabs { padding-left: 14px; padding-right: 14px; }
+}
+</style>
+</head>
+<body>
+
+<!-- ══ SETTINGS ══ -->
+<div id="settings-overlay">
+<div class="sp">
+  <h2>Настройка аккаунтов</h2>
+  <p class="sub">Добавь один или несколько аккаунтов Яндекс.Директ. У каждого может быть свой токен, логин и набор целей.<br>Данные сохраняются в localStorage браузера.</p>
+
+  <div class="global-settings">
+    <div style="font-family:var(--font-d);font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:12px;">Глобальные настройки</div>
+    <div class="global-settings-grid">
+      <div class="fg">
+        <label>Прокси URL (Cloudflare Worker)</label>
+        <input type="text" id="g-proxy" placeholder="https://your-worker.workers.dev">
+        <span class="hint">Один Worker для всех аккаунтов. Обязателен для GitHub Pages.</span>
+      </div>
+      <div class="fg">
+        <label>Режим</label>
+        <div style="display:flex;gap:14px;margin-top:6px">
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;text-transform:none;letter-spacing:0;font-size:12px">
+            <input type="radio" name="g-mode" value="production" checked> Боевой
+          </label>
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;text-transform:none;letter-spacing:0;font-size:12px">
+            <input type="radio" name="g-mode" value="sandbox"> Sandbox
+          </label>
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;text-transform:none;letter-spacing:0;font-size:12px">
+            <input type="radio" name="g-mode" value="demo"> Demo
+          </label>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="accounts-list" id="accounts-list"></div>
+
+  <div class="btn-row" style="margin-bottom:24px">
+    <button class="btn s" onclick="addAccount()">+ Добавить аккаунт</button>
+  </div>
+
+  <div class="btn-row">
+    <button class="btn" onclick="applySettings()">Применить и загрузить →</button>
+    <button class="btn s" onclick="quickDemo()">Demo режим</button>
+  </div>
+</div>
+</div>
+
+<!-- ══ APP ══ -->
+<div id="app">
+  <header>
+    <div class="logo">DIRECT<span>.</span>MULTI</div>
+    <div class="acc-badges" id="acc-badges"></div>
+    <div class="header-right">
+      <div class="export-wrap">
+        <button class="ibtn" onclick="toggleExportMenu()">↓ Экспорт ▾</button>
+        <div class="export-menu" id="export-menu">
+          <div class="export-item" onclick="exportCSV('summary')">Сводный CSV</div>
+          <div class="export-item" onclick="exportCSV('by-account')">По аккаунтам CSV</div>
+          <div class="export-item" onclick="exportCSV('campaigns')">Кампании CSV</div>
+        </div>
+      </div>
+      <button class="ibtn" onclick="fetchAll()">↻ Обновить</button>
+      <button class="ibtn" onclick="showSettings()">⚙ Настройки</button>
+    </div>
+  </header>
+
+  <div class="toolbar">
+    <div class="period-selector">
+      <button class="pb active" onclick="setPeriod('day',this)">Дни</button>
+      <button class="pb" onclick="setPeriod('week',this)">Недели</button>
+      <button class="pb" onclick="setPeriod('month',this)">Месяцы</button>
+      <button class="pb" onclick="setPeriod('quarter',this)">Квартал</button>
+      <button class="pb" onclick="setPeriod('halfyear',this)">Полгода</button>
+      <button class="pb" onclick="setPeriod('year',this)">Год</button>
+    </div>
+    <div class="date-range">
+      <span>С</span>
+      <input type="date" id="date-from">
+      <span>По</span>
+      <input type="date" id="date-to">
+    </div>
+  </div>
+
+  <div class="view-tabs">
+    <button class="tab-btn active" onclick="switchTab('summary',this)">Сводная</button>
+    <button class="tab-btn" onclick="switchTab('accounts',this)">По аккаунтам</button>
+    <button class="tab-btn" onclick="switchTab('campaigns',this)">Кампании</button>
+  </div>
+
+  <main>
+    <div class="err-bar" id="err-bar">
+      <span>⚠</span><span id="err-text">Ошибка</span>
+      <button class="ibtn" style="margin-left:auto;padding:3px 8px;font-size:10px" onclick="hideErr()">✕</button>
+    </div>
+
+    <!-- ── TAB: SUMMARY ── -->
+    <div id="tab-summary">
+      <div class="kpi-grid" id="sum-kpi">
+        <div class="kpi-card"><div class="kpi-label">Показы</div><div class="kpi-value c-acc" id="s-imp">—</div><div class="kpi-sub">все аккаунты</div></div>
+        <div class="kpi-card"><div class="kpi-label">Клики</div><div class="kpi-value c-acc2" id="s-clk">—</div><div class="kpi-sub">все аккаунты</div></div>
+        <div class="kpi-card"><div class="kpi-label">CTR</div><div class="kpi-value" id="s-ctr">—</div><div class="kpi-sub">средний</div></div>
+        <div class="kpi-card"><div class="kpi-label">Расход (с НДС)</div><div class="kpi-value c-acc3" id="s-cost">—</div><div class="kpi-sub">все аккаунты</div></div>
+        <div class="kpi-card"><div class="kpi-label">Лиды</div><div class="kpi-value c-suc" id="s-leads">—</div><div class="kpi-sub">все цели</div></div>
+        <div class="kpi-card"><div class="kpi-label">CPL</div><div class="kpi-value" id="s-cpl">—</div><div class="kpi-sub">средний</div></div>
+        <div class="kpi-card"><div class="kpi-label">CR</div><div class="kpi-value" id="s-cr">—</div><div class="kpi-sub">средний</div></div>
+      </div>
+
+      <div class="card" style="position:relative" id="chart-main-card">
+        <div class="loader-bar-wrap" id="loader-main"><div class="loader-bar-inner"><div class="lb"></div><div class="lbt">Загрузка</div></div></div>
+        <div class="card-header">
+          <div><div class="card-title">Динамика расхода</div><div class="card-sub">Все аккаунты, выбранный период</div></div>
+          <span class="card-tag tag-y">РАСХОД</span>
+        </div>
+        <div class="chart-wrap"><canvas id="chart-cost-main"></canvas></div>
+      </div>
+
+      <div class="charts-2">
+        <div class="card">
+          <div class="card-header">
+            <div><div class="card-title">Лиды & CPL</div><div class="card-sub">Конверсии</div></div>
+            <span class="card-tag tag-g">ЛИДЫ</span>
+          </div>
+          <div class="chart-wrap"><canvas id="chart-leads-main"></canvas></div>
+        </div>
+        <div class="card">
+          <div class="card-header">
+            <div><div class="card-title">CTR & CR</div><div class="card-sub">Эффективность, %</div></div>
+            <span class="card-tag tag-b">CTR / CR</span>
+          </div>
+          <div class="chart-wrap"><canvas id="chart-eff-main"></canvas></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── TAB: ACCOUNTS ── -->
+    <div id="tab-accounts" style="display:none">
+      <div class="card" style="position:relative" id="card-acc-table">
+        <div class="loader-bar-wrap" id="loader-accs"><div class="loader-bar-inner"><div class="lb"></div></div></div>
+        <div class="card-header">
+          <div><div class="card-title">Сравнение аккаунтов</div><div class="card-sub">Итоги за период — клик по аккаунту открывает кампании</div></div>
+        </div>
+        <div class="tbl-wrap">
+          <table class="dtbl">
+            <thead>
+              <tr>
+                <th></th>
+                <th>Аккаунт</th>
+                <th class="n">Показы</th>
+                <th class="n">Клики</th>
+                <th class="n">CTR, %</th>
+                <th class="n">Расход, ₽</th>
+                <th class="n">Лиды</th>
+                <th class="n">CPL, ₽</th>
+                <th class="n">CR, %</th>
+              </tr>
+            </thead>
+            <tbody id="acc-tbody">
+              <tr><td colspan="9" class="empty">Загружаем данные...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="charts-2">
+        <div class="card">
+          <div class="card-header">
+            <div><div class="card-title">Расход по аккаунтам</div></div>
+            <span class="card-tag tag-o">БЮДЖЕТ</span>
+          </div>
+          <div class="chart-wrap"><canvas id="chart-acc-cost"></canvas></div>
+        </div>
+        <div class="card">
+          <div class="card-header">
+            <div><div class="card-title">Лиды по аккаунтам</div></div>
+            <span class="card-tag tag-g">ЛИДЫ</span>
+          </div>
+          <div class="chart-wrap"><canvas id="chart-acc-leads"></canvas></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── TAB: CAMPAIGNS ── -->
+    <div id="tab-campaigns" style="display:none">
+      <div id="camp-pick-state">
+        <div class="card">
+          <div style="margin-bottom:14px;font-family:var(--font-d);font-size:11px;font-weight:600;color:var(--muted)">Выбери аккаунт</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap" id="camp-acc-picker"></div>
+        </div>
+      </div>
+      <div id="camp-detail-state" style="display:none">
+        <div class="drilldown-header">
+          <button class="drilldown-back" onclick="backFromCampaigns()">← Назад</button>
+          <div class="drilldown-title" id="camp-acc-title">Аккаунт</div>
+        </div>
+        <div class="card" style="position:relative" id="card-camp-table">
+          <div class="loader-bar-wrap" id="loader-camps"><div class="loader-bar-inner"><div class="lb"></div></div></div>
+          <div class="card-header">
+            <div><div class="card-title">Кампании</div><div class="card-sub">Детализация по кампаниям аккаунта</div></div>
+          </div>
+          <div class="tbl-wrap">
+            <table class="dtbl">
+              <thead>
+                <tr>
+                  <th>Кампания</th>
+                  <th>Тип</th>
+                  <th class="n">Показы</th>
+                  <th class="n">Клики</th>
+                  <th class="n">CTR, %</th>
+                  <th class="n">Расход, ₽</th>
+                  <th class="n">Лиды</th>
+                  <th class="n">CPL, ₽</th>
+                  <th class="n">CR, %</th>
+                </tr>
+              </thead>
+              <tbody id="camp-tbody">
+                <tr><td colspan="9" class="empty">Выбери аккаунт</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<script>
+// ════════════════════════════════════════
+// STATE
+// ════════════════════════════════════════
+let ACCOUNTS = [];   // [{name, token, login, goalIds, color}]
+let GLOBAL = { proxyUrl: '', sandbox: false, demo: false };
+let currentPeriod = 'day';
+let currentAccFilter = 'all';
+let currentTab = 'summary';
+let accountData = {};   // { login: { rows:[], campaigns:[] } }
+let charts = {};
+let selectedCampAcc = null;
+
+const ACC_COLORS = [
+  '#e8ff47','#47c5ff','#ff6b47','#47ffb3','#c547ff','#ff47b3','#47ffec','#ffcf47'
+];
+
+// ════════════════════════════════════════
+// SETTINGS BOOTSTRAP
+// ════════════════════════════════════════
+let accountCount = 0;
+
+function addAccount(preset = {}) {
+  accountCount++;
+  const idx = accountCount;
+  const color = ACC_COLORS[(idx - 1) % ACC_COLORS.length];
+
+  const div = document.createElement('div');
+  div.className = 'acc-card';
+  div.id = `acc-card-${idx}`;
+  div.innerHTML = `
+    <div class="acc-card-header">
+      <div style="display:flex;align-items:center;gap:8px">
+        <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${color}"></span>
+        <span class="acc-num">Аккаунт ${idx}</span>
+      </div>
+      <button class="btn d" style="padding:4px 10px;font-size:9px" onclick="removeAccount(${idx})">Удалить</button>
+    </div>
+    <div class="acc-grid">
+      <div class="fg">
+        <label>Название (для дашборда)</label>
+        <input type="text" id="a${idx}-name" value="${preset.name||''}" placeholder="Например: Мой бизнес">
+      </div>
+      <div class="fg">
+        <label>Логин клиента в Директе</label>
+        <input type="text" id="a${idx}-login" value="${preset.login||''}" placeholder="your-login">
+      </div>
+      <div class="fg full">
+        <label>OAuth токен</label>
+        <input type="password" id="a${idx}-token" value="${preset.token||''}" placeholder="y0_AgAAAA...">
+        <span class="hint">Если все аккаунты на одном токене — можно использовать один</span>
+      </div>
+      <div class="fg full">
+        <label>ID целей Метрики для лидов (через запятую)</label>
+        <input type="text" id="a${idx}-goals" value="${(preset.goalIds||[]).join(', ')}" placeholder="12345678, 87654321">
+      </div>
+    </div>
+  `;
+  document.getElementById('accounts-list').appendChild(div);
+  div._idx = idx;
+  div._color = color;
+}
+
+function removeAccount(idx) {
+  const el = document.getElementById(`acc-card-${idx}`);
+  if (el) el.remove();
+}
+
+function applySettings() {
+  const proxy = document.getElementById('g-proxy').value.trim();
+  const mode = document.querySelector('input[name="g-mode"]:checked').value;
+
+  GLOBAL.proxyUrl = proxy;
+  GLOBAL.sandbox = mode === 'sandbox';
+  GLOBAL.demo = mode === 'demo';
+
+  ACCOUNTS = [];
+  const cards = document.querySelectorAll('.acc-card');
+
+  if (mode !== 'demo') {
+    cards.forEach((card, i) => {
+      const idx = card._idx || (i + 1);
+      const name = document.getElementById(`a${idx}-name`)?.value.trim() || `Аккаунт ${i+1}`;
+      const login = document.getElementById(`a${idx}-login`)?.value.trim();
+      const token = document.getElementById(`a${idx}-token`)?.value.trim();
+      const goalsRaw = document.getElementById(`a${idx}-goals`)?.value.trim();
+      const goalIds = goalsRaw ? goalsRaw.split(',').map(g => g.trim()).filter(Boolean) : [];
+
+      if (!login || !token) return;
+      ACCOUNTS.push({ name, login, token, goalIds, color: card._color || ACC_COLORS[i % ACC_COLORS.length] });
+    });
+
+    if (!ACCOUNTS.length) { alert('Добавь хотя бы один аккаунт с токеном и логином!'); return; }
+  } else {
+    ACCOUNTS = [
+      { name: 'Аккаунт Альфа', login: 'demo-alpha', token: '', goalIds: [], color: ACC_COLORS[0] },
+      { name: 'Аккаунт Бета', login: 'demo-beta', token: '', goalIds: [], color: ACC_COLORS[1] },
+      { name: 'Аккаунт Гамма', login: 'demo-gamma', token: '', goalIds: [], color: ACC_COLORS[2] },
+    ];
+  }
+
+  saveToStorage();
+  startApp();
+}
+
+function quickDemo() {
+  document.querySelector('input[name="g-mode"][value="demo"]').checked = true;
+  applySettings();
+}
+
+function saveToStorage() {
+  try {
+    localStorage.setItem('dm_global', JSON.stringify(GLOBAL));
+    localStorage.setItem('dm_accounts', JSON.stringify(ACCOUNTS));
+  } catch(e) {}
+}
+
+function loadFromStorage() {
+  try {
+    const g = JSON.parse(localStorage.getItem('dm_global') || '{}');
+    const a = JSON.parse(localStorage.getItem('dm_accounts') || '[]');
+    if (g.proxyUrl !== undefined) {
+      GLOBAL = g;
+      document.getElementById('g-proxy').value = g.proxyUrl || '';
+      if (g.sandbox) document.querySelector('input[name="g-mode"][value="sandbox"]').checked = true;
+      if (g.demo) document.querySelector('input[name="g-mode"][value="demo"]').checked = true;
+    }
+    if (a.length) {
+      a.forEach(acc => addAccount(acc));
+    } else {
+      addAccount();
+    }
+  } catch(e) {
+    addAccount();
+  }
+}
+
+// ════════════════════════════════════════
+// APP START
+// ════════════════════════════════════════
+function startApp() {
+  document.getElementById('settings-overlay').style.display = 'none';
+  document.getElementById('app').style.display = 'flex';
+
+  buildAccBadges();
+  buildCampPicker();
+  setDefaultDates();
+  fetchAll();
+}
+
+function showSettings() {
+  document.getElementById('settings-overlay').style.display = 'flex';
+}
+
+function buildAccBadges() {
+  const wrap = document.getElementById('acc-badges');
+  wrap.innerHTML = `<span class="acc-badge all" onclick="setAccFilter('all',this)">Все</span>`;
+  ACCOUNTS.forEach(acc => {
+    const b = document.createElement('span');
+    b.className = 'acc-badge';
+    b.textContent = acc.name;
+    b.style.borderColor = acc.color + '40';
+    b.onclick = () => setAccFilter(acc.login, b);
+    wrap.appendChild(b);
+  });
+}
+
+function setAccFilter(login, el) {
+  currentAccFilter = login;
+  document.querySelectorAll('.acc-badge').forEach(b => {
+    b.classList.remove('active', 'all');
+  });
+  if (login === 'all') el.classList.add('all');
+  else el.classList.add('active');
+  renderAll();
+}
+
+function buildCampPicker() {
+  const picker = document.getElementById('camp-acc-picker');
+  picker.innerHTML = '';
+  ACCOUNTS.forEach(acc => {
+    const b = document.createElement('button');
+    b.className = 'btn s';
+    b.style.borderColor = acc.color + '60';
+    b.style.color = acc.color;
+    b.textContent = acc.name;
+    b.onclick = () => openCampaigns(acc);
+    picker.appendChild(b);
+  });
+}
+
+// ════════════════════════════════════════
+// DATES & PERIOD
+// ════════════════════════════════════════
+function fmt(d) { return d.toISOString().split('T')[0]; }
+
+function setDefaultDates() {
+  const now = new Date();
+  const from = new Date();
+  const days = { day:30, week:90, month:180, quarter:90, halfyear:180, year:365 };
+  from.setDate(now.getDate() - (days[currentPeriod] || 30));
+  document.getElementById('date-to').value = fmt(now);
+  document.getElementById('date-from').value = fmt(from);
+}
+
+function setPeriod(p, btn) {
+  currentPeriod = p;
+  document.querySelectorAll('.pb').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  setDefaultDates();
+  fetchAll();
+}
+
+// ════════════════════════════════════════
+// FETCH
+// ════════════════════════════════════════
+async function fetchAll() {
+  showLoader('loader-main', true);
+  showLoader('loader-accs', true);
+  hideErr();
+
+  const tasks = ACCOUNTS.map(acc => fetchAccount(acc));
+  const results = await Promise.allSettled(tasks);
+
+  results.forEach((r, i) => {
+    const acc = ACCOUNTS[i];
+    if (r.status === 'fulfilled') {
+      accountData[acc.login] = r.value;
+    } else {
+      accountData[acc.login] = { error: r.reason?.message || 'Ошибка', rows: [], campaigns: [] };
+      showErr(`[${acc.name}] ${r.reason?.message || 'Ошибка загрузки'}`);
+    }
+  });
+
+  showLoader('loader-main', false);
+  showLoader('loader-accs', false);
+  renderAll();
+}
+
+async function fetchAccount(acc) {
+  if (GLOBAL.demo) {
+    return generateDemoForAccount(acc);
+  }
+
+  const dateFrom = document.getElementById('date-from').value;
+  const dateTo = document.getElementById('date-to').value;
+  const granularity = getGranularity();
+
+  const goalConvFields = acc.goalIds.map(g => `Conversions:${g}`);
+  const fieldNames = ['Date', 'Impressions', 'Clicks', 'Ctr', 'CostWithVat', ...goalConvFields];
+
+  const reportParams = {
+    SelectionCriteria: { DateFrom: dateFrom, DateTo: dateTo },
+    FieldNames: fieldNames,
+    ReportName: `R_${acc.login}_${Date.now()}`,
+    ReportType: 'CAMPAIGN_PERFORMANCE_REPORT',
+    DateRangeType: 'CUSTOM_DATE',
+    Format: 'TSV',
+    IncludeVAT: 'YES',
+    IncludeDiscount: 'NO',
+  };
+
+  const rowsTSV = await apiCall(acc, 'reports', reportParams);
+  const rows = parseTSV(rowsTSV, acc.goalIds, true);
+  const aggRows = aggregateByPeriod(rows);
+
+  // Campaign breakdown (no date split)
+  const campFieldNames = ['CampaignName', 'CampaignType', 'Impressions', 'Clicks', 'CostWithVat', ...goalConvFields];
+  const campParams = {
+    SelectionCriteria: { DateFrom: dateFrom, DateTo: dateTo },
+    FieldNames: campFieldNames,
+    ReportName: `CR_${acc.login}_${Date.now()}`,
+    ReportType: 'CAMPAIGN_PERFORMANCE_REPORT',
+    DateRangeType: 'CUSTOM_DATE',
+    Format: 'TSV',
+    IncludeVAT: 'YES',
+    IncludeDiscount: 'NO',
+  };
+
+  const campTSV = await apiCall(acc, 'reports', campParams);
+  const campaigns = parseTSV(campTSV, acc.goalIds, false);
+
+  return { rows: aggRows, campaigns };
+}
+
+async function apiCall(acc, endpoint, params) {
+  const base = GLOBAL.sandbox
+    ? 'https://api-sandbox.direct.yandex.com/json/v5'
+    : 'https://api.direct.yandex.com/json/v5';
+
+  const headers = {
+    'Content-Type': 'application/json; charset=utf-8',
+    'Authorization': `Bearer ${acc.token}`,
+    'Accept-Language': 'ru',
+    'Client-Login': acc.login,
+    'processingMode': 'auto',
+    'returnMoneyInMicros': 'false',
+  };
+
+  if (GLOBAL.proxyUrl) {
+    const res = await fetch(GLOBAL.proxyUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ endpoint, payload: { params, clientLogin: acc.login }, token: acc.token, sandbox: GLOBAL.sandbox }),
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const text = await res.text();
+    try { const j = JSON.parse(text); if (j.error) throw new Error(j.error.error_detail || 'API error'); } catch(e) { if (e.message !== 'Unexpected token') throw e; }
+    return text;
+  }
+
+  // Direct (may fail CORS)
+  const res = await fetch(`${base}/${endpoint}`, { method: 'POST', headers, body: JSON.stringify(params) });
+  if (res.status === 200) return res.text();
+  if (res.status === 201 || res.status === 202) {
+    const retry = parseInt(res.headers.get('retryIn') || '5', 10);
+    await delay(retry * 1000);
+    return apiCall(acc, endpoint, params);
+  }
+  const err = await res.json();
+  throw new Error(err.error?.error_detail || `HTTP ${res.status}`);
+}
+
+function parseTSV(tsv, goalIds = [], hasDate = true) {
+  const lines = (tsv || '').trim().split('\n');
+  if (lines.length < 2) return [];
+  const headers = lines[0].split('\t');
+  const rows = [];
+  for (let i = 1; i < lines.length; i++) {
+    const line = lines[i];
+    if (line.startsWith('Total') || line.startsWith('Итого') || !line.trim()) continue;
+    const cols = line.split('\t');
+    const row = {};
+    headers.forEach((h, j) => { row[h] = cols[j] || '0'; });
+
+    const leads = goalIds.reduce((sum, g) => sum + (parseFloat(row[`Conversions:${g}`]) || 0), 0);
+    const clicks = parseFloat(row['Clicks']) || 0;
+    const impressions = parseFloat(row['Impressions']) || 0;
+    const cost = parseFloat(row['CostWithVat'] || row['Cost']) || 0;
+
+    const r = {
+      impressions, clicks, cost, leads,
+      ctr: impressions > 0 ? clicks / impressions * 100 : 0,
+      cpl: leads > 0 ? cost / leads : 0,
+      cr: clicks > 0 ? leads / clicks * 100 : 0,
+    };
+    if (hasDate) r.date = row['Date'] || '';
+    if (row['CampaignName']) { r.name = row['CampaignName']; r.type = row['CampaignType'] || ''; }
+    rows.push(r);
+  }
+  return rows;
+}
+
+function getGranularity() {
+  return { day:'DAY', week:'WEEK', month:'MONTH', quarter:'QUARTER', halfyear:'MONTH', year:'MONTH' }[currentPeriod] || 'DAY';
+}
+
+function getPeriodKey(dateStr) {
+  const d = new Date(dateStr);
+  const y = d.getFullYear(), m = d.getMonth();
+  switch(currentPeriod) {
+    case 'week': { const ws = new Date(d); ws.setDate(d.getDate()-d.getDay()+1); return fmt(ws); }
+    case 'month': return `${y}-${String(m+1).padStart(2,'0')}-01`;
+    case 'quarter': return `${y}-Q${Math.floor(m/3)+1}`;
+    case 'halfyear': return `${y}-H${m<6?1:2}`;
+    case 'year': return `${y}-01-01`;
+    default: return dateStr;
+  }
+}
+
+function aggregateByPeriod(rows) {
+  if (currentPeriod === 'day') return rows;
+  const g = {};
+  rows.forEach(r => {
+    const k = getPeriodKey(r.date);
+    if (!g[k]) g[k] = { date:k, impressions:0, clicks:0, cost:0, leads:0 };
+    g[k].impressions += r.impressions;
+    g[k].clicks += r.clicks;
+    g[k].cost += r.cost;
+    g[k].leads += r.leads;
+  });
+  return Object.values(g).map(r => ({ ...r,
+    ctr: r.impressions>0 ? r.clicks/r.impressions*100 : 0,
+    cpl: r.leads>0 ? r.cost/r.leads : 0,
+    cr: r.clicks>0 ? r.leads/r.clicks*100 : 0,
+  })).sort((a,b) => a.date.localeCompare(b.date));
+}
+
+// ════════════════════════════════════════
+// DEMO DATA
+// ════════════════════════════════════════
+function generateDemoForAccount(acc) {
+  const from = new Date(document.getElementById('date-from').value);
+  const to = new Date(document.getElementById('date-to').value);
+  const days = Math.round((to - from) / 86400000);
+
+  // Each account has different baseline to show comparison
+  const accIdx = ACCOUNTS.findIndex(a => a.login === acc.login);
+  const baseMulti = [1, 1.4, 0.7][accIdx] || 1;
+
+  const rows = [];
+  for (let i = 0; i <= days; i++) {
+    const d = new Date(from); d.setDate(from.getDate() + i);
+    const we = d.getDay()===0||d.getDay()===6;
+    const base = (we ? 0.55 : 1) * baseMulti;
+    const trend = 1 + i/days * 0.25;
+    const n = () => 0.8 + Math.random()*0.4;
+
+    const impressions = Math.round(7000 * base * trend * n());
+    const clicks = Math.round(impressions * (0.025 + Math.random()*0.02));
+    const cost = Math.round(clicks * (35 + Math.random()*30) * 1.2);
+    const leads = Math.round(clicks * (0.035 + Math.random()*0.025));
+
+    rows.push({
+      date: fmt(d), impressions, clicks, cost, leads,
+      ctr: impressions>0 ? clicks/impressions*100 : 0,
+      cpl: leads>0 ? cost/leads : 0,
+      cr: clicks>0 ? leads/clicks*100 : 0,
+    });
+  }
+
+  // Demo campaigns
+  const campNames = ['Поиск — общие', 'РСЯ — ретаргетинг', 'Поиск — брендовые', 'Смарт-баннеры'];
+  const campaigns = campNames.map((name, i) => {
+    const m = [0.4, 0.3, 0.2, 0.1][i] * baseMulti;
+    const imp = Math.round(100000 * m * (0.9+Math.random()*0.2));
+    const clk = Math.round(imp * (0.02 + Math.random()*0.02));
+    const cost = Math.round(clk * (30+Math.random()*40) * 1.2);
+    const leads = Math.round(clk * (0.03+Math.random()*0.03));
+    return {
+      name, type: ['TEXT_CAMPAIGN','CPM_BANNER_CAMPAIGN','TEXT_CAMPAIGN','SMART_CAMPAIGN'][i],
+      impressions: imp, clicks: clk, cost, leads,
+      ctr: imp>0 ? clk/imp*100 : 0,
+      cpl: leads>0 ? cost/leads : 0,
+      cr: clk>0 ? leads/clk*100 : 0,
+    };
+  });
+
+  return { rows: aggregateByPeriod(rows), campaigns };
+}
+
+// ════════════════════════════════════════
+// RENDER
+// ════════════════════════════════════════
+function renderAll() {
+  const visibleAccs = currentAccFilter === 'all'
+    ? ACCOUNTS
+    : ACCOUNTS.filter(a => a.login === currentAccFilter);
+
+  // Merge rows across visible accounts
+  const mergedByDate = {};
+  visibleAccs.forEach(acc => {
+    const data = accountData[acc.login];
+    if (!data || !data.rows) return;
+    data.rows.forEach(r => {
+      if (!mergedByDate[r.date]) mergedByDate[r.date] = { date: r.date, impressions:0, clicks:0, cost:0, leads:0 };
+      mergedByDate[r.date].impressions += r.impressions;
+      mergedByDate[r.date].clicks += r.clicks;
+      mergedByDate[r.date].cost += r.cost;
+      mergedByDate[r.date].leads += r.leads;
+    });
+  });
+
+  const merged = Object.values(mergedByDate)
+    .sort((a,b) => a.date.localeCompare(b.date))
+    .map(r => ({ ...r,
+      ctr: r.impressions>0 ? r.clicks/r.impressions*100 : 0,
+      cpl: r.leads>0 ? r.cost/r.leads : 0,
+      cr: r.clicks>0 ? r.leads/r.clicks*100 : 0,
+    }));
+
+  renderSummaryKPIs(merged);
+  renderSummaryCharts(merged);
+  renderAccountsTab(visibleAccs);
+}
+
+function totalsFrom(rows) {
+  const t = rows.reduce((a,r) => ({ impressions:a.impressions+r.impressions, clicks:a.clicks+r.clicks, cost:a.cost+r.cost, leads:a.leads+r.leads }), { impressions:0, clicks:0, cost:0, leads:0 });
+  return { ...t,
+    ctr: t.impressions>0 ? t.clicks/t.impressions*100 : 0,
+    cpl: t.leads>0 ? t.cost/t.leads : 0,
+    cr: t.clicks>0 ? t.leads/t.clicks*100 : 0,
+  };
+}
+
+function renderSummaryKPIs(rows) {
+  const t = totalsFrom(rows);
+  document.getElementById('s-imp').textContent = fmtNum(t.impressions);
+  document.getElementById('s-clk').textContent = fmtNum(t.clicks);
+  document.getElementById('s-ctr').textContent = t.ctr.toFixed(2)+'%';
+  document.getElementById('s-cost').textContent = fmtMoney(t.cost);
+  document.getElementById('s-leads').textContent = fmtNum(t.leads);
+  document.getElementById('s-cpl').textContent = fmtMoney(t.cpl);
+  document.getElementById('s-cr').textContent = t.cr.toFixed(2)+'%';
+}
+
+function renderSummaryCharts(rows) {
+  const labels = rows.map(r => r.date);
+  const co = chartOpts;
+
+  renderChart('chart-cost-main', {
+    type: 'line',
+    data: { labels, datasets: [
+      { label:'Расход ₽', data: rows.map(r=>r.cost), borderColor:'#ff6b47', backgroundColor:'rgba(255,107,71,0.07)', fill:true, tension:0.4, pointRadius:rows.length>60?0:2.5 },
+      { label:'Клики', data: rows.map(r=>r.clicks), borderColor:'#47c5ff', backgroundColor:'transparent', tension:0.4, yAxisID:'y1', pointRadius:rows.length>60?0:2.5 },
+    ]},
+    options: co({ dual:true, l0:'₽', l1:'' }),
+  });
+
+  renderChart('chart-leads-main', {
+    type: 'bar',
+    data: { labels, datasets: [
+      { label:'Лиды', data: rows.map(r=>r.leads), backgroundColor:'rgba(71,255,179,0.55)', borderColor:'#47ffb3', borderWidth:1, yAxisID:'y' },
+      { label:'CPL ₽', data: rows.map(r=>r.cpl), borderColor:'#e8ff47', backgroundColor:'transparent', type:'line', tension:0.4, yAxisID:'y1', pointRadius:0 },
+    ]},
+    options: co({ dual:true, l0:'', l1:'₽' }),
+  });
+
+  renderChart('chart-eff-main', {
+    type: 'line',
+    data: { labels, datasets: [
+      { label:'CTR %', data: rows.map(r=>r.ctr.toFixed(3)), borderColor:'#47c5ff', backgroundColor:'rgba(71,197,255,0.07)', fill:true, tension:0.4, pointRadius:0 },
+      { label:'CR %', data: rows.map(r=>r.cr.toFixed(3)), borderColor:'#e8ff47', backgroundColor:'transparent', tension:0.4, yAxisID:'y1', pointRadius:0 },
+    ]},
+    options: co({ dual:true, l0:'%', l1:'%' }),
+  });
+}
+
+function renderAccountsTab(visibleAccs) {
+  const tbody = document.getElementById('acc-tbody');
+
+  if (!visibleAccs.length) {
+    tbody.innerHTML = '<tr><td colspan="9" class="empty">Нет данных</td></tr>';
+    return;
+  }
+
+  let html = '';
+  let totImp=0, totClk=0, totCost=0, totLeads=0;
+  const accTotals = [];
+
+  visibleAccs.forEach(acc => {
+    const data = accountData[acc.login];
+    const status = !data ? 'load' : data.error ? 'err' : 'ok';
+    const rows = data?.rows || [];
+    const t = totalsFrom(rows);
+    accTotals.push({ ...acc, ...t });
+    totImp += t.impressions; totClk += t.clicks; totCost += t.cost; totLeads += t.leads;
+
+    html += `<tr>
+      <td><span class="status-${status}"></span></td>
+      <td class="acc-name clickable" onclick="openCampaignsFromTable('${acc.login}')" style="color:${acc.color}">
+        ${acc.name}
+        <span style="font-size:10px;color:var(--muted);margin-left:4px;font-family:var(--font-m)">${acc.login}</span>
+      </td>
+      <td class="n">${fmtNum(t.impressions)}</td>
+      <td class="n">${fmtNum(t.clicks)}</td>
+      <td class="n">${t.ctr.toFixed(2)}%</td>
+      <td class="n">${fmtMoney(t.cost)}</td>
+      <td class="n">${fmtNum(t.leads)}</td>
+      <td class="n">${t.leads>0?fmtMoney(t.cpl):'—'}</td>
+      <td class="n">${t.cr.toFixed(2)}%</td>
+    </tr>`;
+  });
+
+  // Total row
+  const totCtr = totImp>0 ? totClk/totImp*100 : 0;
+  const totCpl = totLeads>0 ? totCost/totLeads : 0;
+  const totCr = totClk>0 ? totLeads/totClk*100 : 0;
+  html += `<tr class="total-row">
+    <td></td>
+    <td class="acc-name">Итого</td>
+    <td class="n">${fmtNum(totImp)}</td>
+    <td class="n">${fmtNum(totClk)}</td>
+    <td class="n">${totCtr.toFixed(2)}%</td>
+    <td class="n">${fmtMoney(totCost)}</td>
+    <td class="n">${fmtNum(totLeads)}</td>
+    <td class="n">${totLeads>0?fmtMoney(totCpl):'—'}</td>
+    <td class="n">${totCr.toFixed(2)}%</td>
+  </tr>`;
+
+  tbody.innerHTML = html;
+
+  // Comparison charts
+  const accLabels = accTotals.map(a => a.name);
+  const accColors = accTotals.map(a => a.color);
+
+  renderChart('chart-acc-cost', {
+    type: 'bar',
+    data: { labels: accLabels, datasets: [{
+      label: 'Расход ₽',
+      data: accTotals.map(a => a.cost),
+      backgroundColor: accColors.map(c => c+'99'),
+      borderColor: accColors,
+      borderWidth: 1,
+    }]},
+    options: chartOpts({ l0:'₽' }),
+  });
+
+  renderChart('chart-acc-leads', {
+    type: 'bar',
+    data: { labels: accLabels, datasets: [{
+      label: 'Лиды',
+      data: accTotals.map(a => a.leads),
+      backgroundColor: accColors.map(c => c+'99'),
+      borderColor: accColors,
+      borderWidth: 1,
+    }]},
+    options: chartOpts({ l0:'' }),
+  });
+}
+
+// ════════════════════════════════════════
+// CAMPAIGNS DRILLDOWN
+// ════════════════════════════════════════
+function openCampaigns(acc) {
+  switchTab('campaigns', document.querySelector('.tab-btn:nth-child(3)'));
+  openCampaignsFromTable(acc.login);
+}
+
+function openCampaignsFromTable(login) {
+  selectedCampAcc = ACCOUNTS.find(a => a.login === login);
+  if (!selectedCampAcc) return;
+
+  if (currentTab !== 'campaigns') {
+    switchTab('campaigns', document.querySelector('.tab-btn:nth-child(3)'));
+  }
+
+  document.getElementById('camp-pick-state').style.display = 'none';
+  document.getElementById('camp-detail-state').style.display = 'block';
+  document.getElementById('camp-acc-title').textContent = selectedCampAcc.name;
+  document.getElementById('camp-acc-title').style.color = selectedCampAcc.color;
+
+  renderCampaigns(selectedCampAcc);
+}
+
+function backFromCampaigns() {
+  document.getElementById('camp-pick-state').style.display = 'block';
+  document.getElementById('camp-detail-state').style.display = 'none';
+  selectedCampAcc = null;
+}
+
+function renderCampaigns(acc) {
+  const data = accountData[acc.login];
+  const tbody = document.getElementById('camp-tbody');
+  showLoader('loader-camps', false);
+
+  if (!data || !data.campaigns || !data.campaigns.length) {
+    tbody.innerHTML = '<tr><td colspan="9" class="empty">Нет данных по кампаниям</td></tr>';
+    return;
+  }
+
+  const camps = [...data.campaigns].sort((a,b) => b.cost - a.cost);
+  let html = '';
+  let totImp=0, totClk=0, totCost=0, totLeads=0;
+
+  camps.forEach(c => {
+    totImp+=c.impressions; totClk+=c.clicks; totCost+=c.cost; totLeads+=c.leads;
+    const typeLabel = { TEXT_CAMPAIGN:'Текст', CPM_BANNER_CAMPAIGN:'Баннер', SMART_CAMPAIGN:'Смарт', DYNAMIC_TEXT_CAMPAIGN:'Динамич.' }[c.type] || c.type || '—';
+    html += `<tr>
+      <td>${c.name}</td>
+      <td><span style="font-size:10px;padding:2px 7px;border:1px solid var(--border);color:var(--muted)">${typeLabel}</span></td>
+      <td class="n">${fmtNum(c.impressions)}</td>
+      <td class="n">${fmtNum(c.clicks)}</td>
+      <td class="n">${c.ctr.toFixed(2)}%</td>
+      <td class="n">${fmtMoney(c.cost)}</td>
+      <td class="n">${fmtNum(c.leads)}</td>
+      <td class="n">${c.leads>0?fmtMoney(c.cpl):'—'}</td>
+      <td class="n">${c.cr.toFixed(2)}%</td>
+    </tr>`;
+  });
+
+  const totCtr = totImp>0 ? totClk/totImp*100 : 0;
+  html += `<tr class="total-row">
+    <td>Итого</td><td></td>
+    <td class="n">${fmtNum(totImp)}</td>
+    <td class="n">${fmtNum(totClk)}</td>
+    <td class="n">${totCtr.toFixed(2)}%</td>
+    <td class="n">${fmtMoney(totCost)}</td>
+    <td class="n">${fmtNum(totLeads)}</td>
+    <td class="n">${totLeads>0?fmtMoney(totCost/totLeads):'—'}</td>
+    <td class="n">${(totClk>0?totLeads/totClk*100:0).toFixed(2)}%</td>
+  </tr>`;
+
+  tbody.innerHTML = html;
+}
+
+// ════════════════════════════════════════
+// TABS
+// ════════════════════════════════════════
+function switchTab(tab, btn) {
+  currentTab = tab;
+  ['summary','accounts','campaigns'].forEach(t => {
+    document.getElementById('tab-'+t).style.display = t===tab ? 'block' : 'none';
+  });
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+}
+
+// ════════════════════════════════════════
+// EXPORT
+// ════════════════════════════════════════
+function toggleExportMenu() {
+  document.getElementById('export-menu').classList.toggle('open');
+}
+document.addEventListener('click', e => {
+  if (!e.target.closest('.export-wrap')) {
+    document.getElementById('export-menu')?.classList.remove('open');
+  }
+});
+
+function exportCSV(type) {
+  document.getElementById('export-menu').classList.remove('open');
+  let csv = '', filename = '';
+
+  if (type === 'summary') {
+    csv = 'Дата,Показы,Клики,CTR%,Расход,Лиды,CPL,CR%\n';
+    const all = {};
+    ACCOUNTS.forEach(acc => {
+      (accountData[acc.login]?.rows || []).forEach(r => {
+        if (!all[r.date]) all[r.date] = { impressions:0, clicks:0, cost:0, leads:0 };
+        all[r.date].impressions += r.impressions;
+        all[r.date].clicks += r.clicks;
+        all[r.date].cost += r.cost;
+        all[r.date].leads += r.leads;
+      });
+    });
+    Object.entries(all).sort().forEach(([d,r]) => {
+      const ctr = r.impressions>0?r.clicks/r.impressions*100:0;
+      const cpl = r.leads>0?r.cost/r.leads:0;
+      const cr = r.clicks>0?r.leads/r.clicks*100:0;
+      csv += `${d},${r.impressions},${r.clicks},${ctr.toFixed(2)},${r.cost.toFixed(2)},${r.leads},${cpl.toFixed(2)},${cr.toFixed(2)}\n`;
+    });
+    filename = 'direct_summary.csv';
+  }
+
+  else if (type === 'by-account') {
+    csv = 'Аккаунт,Показы,Клики,CTR%,Расход,Лиды,CPL,CR%\n';
+    ACCOUNTS.forEach(acc => {
+      const t = totalsFrom(accountData[acc.login]?.rows || []);
+      csv += `${acc.name},${t.impressions},${t.clicks},${t.ctr.toFixed(2)},${t.cost.toFixed(2)},${t.leads},${t.cpl.toFixed(2)},${t.cr.toFixed(2)}\n`;
+    });
+    filename = 'direct_by_account.csv';
+  }
+
+  else if (type === 'campaigns') {
+    csv = 'Аккаунт,Кампания,Тип,Показы,Клики,CTR%,Расход,Лиды,CPL,CR%\n';
+    ACCOUNTS.forEach(acc => {
+      (accountData[acc.login]?.campaigns || []).forEach(c => {
+        csv += `${acc.name},${c.name},${c.type},${c.impressions},${c.clicks},${c.ctr.toFixed(2)},${c.cost.toFixed(2)},${c.leads},${c.cpl.toFixed(2)},${c.cr.toFixed(2)}\n`;
+      });
+    });
+    filename = 'direct_campaigns.csv';
+  }
+
+  const blob = new Blob(['\uFEFF'+csv], { type: 'text/csv;charset=utf-8;' });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = filename; a.click();
+}
+
+// ════════════════════════════════════════
+// CHART HELPERS
+// ════════════════════════════════════════
+function renderChart(id, config) {
+  if (charts[id]) { charts[id].destroy(); }
+  const ctx = document.getElementById(id);
+  if (!ctx) return;
+  charts[id] = new Chart(ctx.getContext('2d'), config);
+}
+
+function chartOpts({ dual=false, l0='', l1='' } = {}) {
+  const base = {
+    responsive: true, maintainAspectRatio: false,
+    interaction: { mode:'index', intersect:false },
+    plugins: {
+      legend: { labels: { color:'#5a607a', font:{ family:'JetBrains Mono', size:11 }, boxWidth:12 } },
+      tooltip: { backgroundColor:'#0e1018', borderColor:'#1e2230', borderWidth:1, titleColor:'#f0f2ff', bodyColor:'#5a607a', titleFont:{family:'Unbounded',size:10}, bodyFont:{family:'JetBrains Mono',size:11} },
+    },
+    scales: {
+      x: { grid:{ color:'rgba(30,34,48,0.4)' }, ticks:{ color:'#5a607a', font:{family:'JetBrains Mono',size:10}, maxTicksLimit:8, maxRotation:30 } },
+      y: { grid:{ color:'rgba(30,34,48,0.4)' }, ticks:{ color:'#5a607a', font:{family:'JetBrains Mono',size:10}, callback: v => l0==='₽' ? '₽'+fmtCmp(v) : fmtCmp(v)+l0 } }
+    }
+  };
+  if (dual) base.scales.y1 = {
+    position:'right', grid:{ drawOnChartArea:false },
+    ticks:{ color:'#5a607a', font:{family:'JetBrains Mono',size:10}, callback: v => l1==='₽' ? '₽'+fmtCmp(v) : fmtCmp(v)+l1 }
+  };
+  return base;
+}
+
+// ════════════════════════════════════════
+// FORMAT / UTILS
+// ════════════════════════════════════════
+function fmtNum(n) { return Math.round(n).toLocaleString('ru-RU'); }
+function fmtMoney(n) {
+  if (n>=1e6) return (n/1e6).toFixed(1)+' млн ₽';
+  if (n>=1000) return (n/1000).toFixed(1)+' тыс ₽';
+  return Math.round(n).toLocaleString('ru-RU')+' ₽';
+}
+function fmtCmp(n) {
+  if (n>=1e6) return (n/1e6).toFixed(1)+'M';
+  if (n>=1000) return (n/1000).toFixed(0)+'K';
+  return Math.round(n);
+}
+
+function showLoader(id, show) {
+  const el = document.getElementById(id);
+  if (el) el.style.display = show ? 'flex' : 'none';
+}
+function showErr(msg) {
+  document.getElementById('err-text').textContent = msg;
+  document.getElementById('err-bar').classList.add('show');
+}
+function hideErr() { document.getElementById('err-bar').classList.remove('show'); }
+function delay(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+// ════════════════════════════════════════
+// INIT
+// ════════════════════════════════════════
+loadFromStorage();
+setDefaultDates();
+</script>
+</body>
+</html>

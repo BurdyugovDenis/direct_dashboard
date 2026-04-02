@@ -1,0 +1,984 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Яркие каникулы — Аналитика</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@400;600;800&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg: #f5f3ee;
+  --surface: #ffffff;
+  --surface2: #f0ede6;
+  --border: #e0dbd0;
+  --text: #1a1814;
+  --muted: #8a8478;
+  --accent: #c8401a;
+  --accent2: #1a5fc8;
+  --accent3: #2da06e;
+  --accent4: #c8971a;
+  --font-d: 'Unbounded', sans-serif;
+  --font-m: 'JetBrains Mono', monospace;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-m);
+  font-size: 13px;
+  min-height: 100vh;
+}
+
+/* ── SETUP ── */
+#setup {
+  position: fixed; inset: 0;
+  background: var(--bg);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 100; padding: 20px;
+}
+.setup-box {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-top: 3px solid var(--accent);
+  padding: 40px;
+  max-width: 560px; width: 100%;
+}
+.setup-box h1 {
+  font-family: var(--font-d);
+  font-size: 16px; font-weight: 800;
+  color: var(--accent);
+  margin-bottom: 6px;
+}
+.setup-box p {
+  font-size: 11px; color: var(--muted);
+  line-height: 1.8; margin-bottom: 28px;
+}
+.fg { display: flex; flex-direction: column; gap: 6px; margin-bottom: 18px; }
+.fg label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; }
+.fg input {
+  background: var(--bg); border: 1px solid var(--border);
+  color: var(--text); font-family: var(--font-m); font-size: 12px;
+  padding: 10px 14px; outline: none; width: 100%;
+}
+.fg input:focus { border-color: var(--accent); }
+.fg .hint { font-size: 10px; color: var(--muted); line-height: 1.6; }
+.btn {
+  background: var(--accent); color: #fff; border: none;
+  font-family: var(--font-d); font-size: 11px; font-weight: 600;
+  padding: 12px 24px; cursor: pointer; transition: opacity 0.15s;
+  text-transform: uppercase; letter-spacing: 0.5px; width: 100%;
+}
+.btn:hover { opacity: 0.85; }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* ── HEADER ── */
+header {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 14px 28px;
+  display: flex; align-items: center; justify-content: space-between;
+  position: sticky; top: 0; z-index: 10;
+  flex-wrap: wrap; gap: 10px;
+}
+.logo { font-family: var(--font-d); font-size: 13px; font-weight: 800; letter-spacing: -0.5px; }
+.logo em { color: var(--accent); font-style: normal; }
+.hright { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.ibtn {
+  background: none; border: 1px solid var(--border); color: var(--muted);
+  font-family: var(--font-m); font-size: 11px; padding: 5px 12px;
+  cursor: pointer; transition: all 0.15s;
+}
+.ibtn:hover { border-color: var(--accent); color: var(--accent); }
+
+.last-update { font-size: 10px; color: var(--muted); }
+
+/* ── TOOLBAR ── */
+.toolbar {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 10px 28px;
+  display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+}
+
+/* Period pills */
+.pills { display: flex; gap: 2px; }
+.pill {
+  background: none; border: 1px solid var(--border); color: var(--muted);
+  font-family: var(--font-m); font-size: 11px; padding: 4px 12px;
+  cursor: pointer; transition: all 0.15s;
+}
+.pill:hover { border-color: var(--accent2); color: var(--accent2); }
+.pill.active { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 500; }
+
+/* Filters */
+.filter-group { display: flex; align-items: center; gap: 6px; }
+.filter-group label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; white-space: nowrap; }
+.filter-group select {
+  background: var(--bg); border: 1px solid var(--border);
+  color: var(--text); font-family: var(--font-m); font-size: 11px;
+  padding: 4px 8px; outline: none; cursor: pointer;
+}
+.filter-group select:focus { border-color: var(--accent); }
+
+/* ── TABS ── */
+.tabs {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 0 28px;
+  display: flex;
+}
+.tab {
+  background: none; border: none; border-bottom: 2px solid transparent;
+  font-family: var(--font-d); font-size: 10px; font-weight: 600;
+  color: var(--muted); padding: 12px 18px;
+  cursor: pointer; transition: all 0.15s; text-transform: uppercase;
+}
+.tab:hover { color: var(--text); }
+.tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+/* ── MAIN ── */
+main { padding: 24px 28px; display: flex; flex-direction: column; gap: 20px; max-width: 1400px; }
+
+/* ── KPI ── */
+.kpi-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 1px; background: var(--border); border: 1px solid var(--border);
+}
+.kpi {
+  background: var(--surface); padding: 18px 20px;
+  transition: background 0.15s; cursor: default;
+  position: relative;
+}
+.kpi::after {
+  content: ''; position: absolute; bottom: 0; left: 0; right: 0;
+  height: 2px; background: var(--accent); transform: scaleX(0);
+  transition: transform 0.25s; transform-origin: left;
+}
+.kpi:hover::after { transform: scaleX(1); }
+.kpi:hover { background: var(--surface2); }
+.kpi-label { font-size: 9px; color: var(--muted); text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 10px; }
+.kpi-val { font-family: var(--font-d); font-size: 22px; font-weight: 800; letter-spacing: -1px; line-height: 1; margin-bottom: 5px; }
+.kpi-sub { font-size: 10px; color: var(--muted); }
+.c1 { color: var(--accent); }
+.c2 { color: var(--accent2); }
+.c3 { color: var(--accent3); }
+.c4 { color: var(--accent4); }
+
+/* ── CARD ── */
+.card { background: var(--surface); border: 1px solid var(--border); padding: 20px; }
+.card-hdr { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px; }
+.card-title { font-family: var(--font-d); font-size: 11px; font-weight: 600; }
+.card-sub { font-size: 10px; color: var(--muted); margin-top: 2px; }
+.tag { font-size: 9px; font-weight: 600; padding: 3px 8px; text-transform: uppercase; letter-spacing: 1px; border: 1px solid; }
+.tag-r { color: var(--accent);  border-color: var(--accent);  background: rgba(200,64,26,0.06); }
+.tag-b { color: var(--accent2); border-color: var(--accent2); background: rgba(26,95,200,0.06); }
+.tag-g { color: var(--accent3); border-color: var(--accent3); background: rgba(45,160,110,0.06); }
+
+.chart-wrap { position: relative; height: 210px; }
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+
+/* ── TABLE ── */
+.tbl-wrap { overflow-x: auto; }
+.dtbl { width: 100%; border-collapse: collapse; }
+.dtbl th {
+  background: var(--surface2); padding: 9px 14px;
+  text-align: left; font-size: 9px; font-weight: 500;
+  color: var(--muted); text-transform: uppercase; letter-spacing: 1.5px;
+  border-bottom: 1px solid var(--border); white-space: nowrap; cursor: pointer;
+}
+.dtbl th:hover { color: var(--text); }
+.dtbl th.sort-asc::after { content: ' ↑'; }
+.dtbl th.sort-desc::after { content: ' ↓'; }
+.dtbl td { padding: 10px 14px; font-size: 12px; border-bottom: 1px solid var(--surface2); white-space: nowrap; }
+.dtbl tr:hover td { background: var(--surface2); }
+.dtbl tr:last-child td { border-bottom: none; }
+.dtbl td.n, .dtbl th.n { text-align: right; }
+.dtbl .total-row td { background: rgba(200,64,26,0.04); font-weight: 600; border-top: 1px solid var(--border); }
+.net-badge {
+  display: inline-block; font-size: 9px; padding: 2px 6px;
+  border: 1px solid var(--border); color: var(--muted);
+  font-family: var(--font-m);
+}
+.net-search { border-color: var(--accent2); color: var(--accent2); background: rgba(26,95,200,0.05); }
+.net-rsya { border-color: var(--accent3); color: var(--accent3); background: rgba(45,160,110,0.05); }
+
+/* ── LOADING ── */
+#loading {
+  position: fixed; inset: 0; background: var(--bg);
+  display: none; align-items: center; justify-content: center;
+  flex-direction: column; gap: 16px; z-index: 200;
+}
+.spin-track { width: 120px; height: 2px; background: var(--border); overflow: hidden; position: relative; }
+.spin-track::after {
+  content: ''; position: absolute; left: -40%; width: 40%;
+  height: 100%; background: var(--accent);
+  animation: spin 1s ease-in-out infinite;
+}
+@keyframes spin { to { left: 140%; } }
+.spin-text { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; }
+
+.err-box {
+  background: rgba(200,64,26,0.08); border: 1px solid rgba(200,64,26,0.3);
+  color: var(--accent); padding: 10px 16px; font-size: 12px;
+  display: none; margin-bottom: 16px;
+}
+.err-box.show { display: block; }
+
+@media (max-width: 768px) {
+  main, header, .toolbar, .tabs { padding-left: 14px; padding-right: 14px; }
+  .grid-2, .grid-3 { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+
+<!-- ── SETUP ── -->
+<div id="setup">
+  <div class="setup-box">
+    <h1>Яркие каникулы — Аналитика</h1>
+    <p>Дашборд читает данные напрямую из Google Таблицы.<br>
+    Таблица должна быть открыта для просмотра по ссылке (Файл → Настройки доступа → Все у кого есть ссылка → Читатель).</p>
+    <div class="fg">
+      <label>ID Google Таблицы</label>
+      <input type="text" id="sheet-id" placeholder="1l-7MQTU5OSSkyqxU8j3sclzz2KtzONQhl26QyPBDzHQ">
+      <span class="hint">Из URL таблицы: docs.google.com/spreadsheets/d/<strong>ВОТ_ЭТА_ЧАСТЬ</strong>/edit</span>
+    </div>
+    <div class="fg">
+      <label>Название листа</label>
+      <input type="text" id="sheet-name" value="data" placeholder="data">
+    </div>
+    <div id="setup-err" class="err-box"></div>
+    <button class="btn" id="load-btn" onclick="loadSheet()">Загрузить данные →</button>
+  </div>
+</div>
+
+<!-- ── LOADING ── -->
+<div id="loading">
+  <div class="spin-track"></div>
+  <div class="spin-text" id="loading-text">Загружаем данные...</div>
+</div>
+
+<!-- ── APP ── -->
+<div id="app" style="display:none">
+  <header>
+    <div class="logo">ЯРКИЕ<em>.</em>АНАЛИТИКА</div>
+    <div class="hright">
+      <span class="last-update" id="last-update"></span>
+      <button class="ibtn" onclick="reloadData()">↻ Обновить</button>
+      <button class="ibtn" onclick="exportCSV()">↓ CSV</button>
+      <button class="ibtn" onclick="document.getElementById('setup').style.display='flex'">⚙</button>
+    </div>
+  </header>
+
+  <div class="toolbar">
+    <div class="pills" id="period-pills">
+      <button class="pill active" data-p="day"     onclick="setPeriod(this)">Дни</button>
+      <button class="pill"        data-p="week"    onclick="setPeriod(this)">Недели</button>
+      <button class="pill"        data-p="month"   onclick="setPeriod(this)">Месяцы</button>
+    </div>
+
+    <div class="filter-group">
+      <label>Аккаунт</label>
+      <select id="f-account" onchange="applyFilters()"><option value="">Все</option></select>
+    </div>
+
+    <div class="filter-group">
+      <label>Кампания</label>
+      <select id="f-campaign" onchange="applyFilters()"><option value="">Все</option></select>
+    </div>
+
+    <div class="filter-group">
+      <label>Сеть</label>
+      <select id="f-network" onchange="applyFilters()">
+        <option value="">Все</option>
+        <option value="SEARCH">Поиск</option>
+        <option value="AD_NETWORK">РСЯ</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab active" onclick="switchTab('overview',this)">Обзор</button>
+    <button class="tab" onclick="switchTab('accounts',this)">По аккаунтам</button>
+    <button class="tab" onclick="switchTab('campaigns',this)">Кампании</button>
+    <button class="tab" onclick="switchTab('network',this)">Поиск vs РСЯ</button>
+  </div>
+
+  <main>
+    <div class="err-box" id="err-box"></div>
+
+    <!-- KPI -->
+    <div class="kpi-row">
+      <div class="kpi"><div class="kpi-label">Показы</div><div class="kpi-val c1" id="k-imp">—</div><div class="kpi-sub" id="ks-imp">все аккаунты</div></div>
+      <div class="kpi"><div class="kpi-label">Клики</div><div class="kpi-val c2" id="k-clk">—</div><div class="kpi-sub" id="ks-clk">все аккаунты</div></div>
+      <div class="kpi"><div class="kpi-label">CTR</div><div class="kpi-val" id="k-ctr">—</div><div class="kpi-sub">средний</div></div>
+      <div class="kpi"><div class="kpi-label">Расход (с НДС)</div><div class="kpi-val c1" id="k-cost">—</div><div class="kpi-sub">все аккаунты</div></div>
+      <div class="kpi"><div class="kpi-label">Лиды</div><div class="kpi-val c3" id="k-conv">—</div><div class="kpi-sub">конверсии</div></div>
+      <div class="kpi"><div class="kpi-label">CPL</div><div class="kpi-val" id="k-cpl">—</div><div class="kpi-sub">стоимость лида</div></div>
+      <div class="kpi"><div class="kpi-label">CR</div><div class="kpi-val" id="k-cr">—</div><div class="kpi-sub">конверсия</div></div>
+    </div>
+
+    <!-- ── TAB: OVERVIEW ── -->
+    <div id="tab-overview">
+      <div class="card">
+        <div class="card-hdr">
+          <div><div class="card-title">Динамика расхода и кликов</div><div class="card-sub" id="chart-period-label">По дням</div></div>
+          <span class="tag tag-r">РАСХОД + КЛИКИ</span>
+        </div>
+        <div class="chart-wrap"><canvas id="ch-main"></canvas></div>
+      </div>
+
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-hdr">
+            <div><div class="card-title">Лиды & CPL</div></div>
+            <span class="tag tag-g">КОНВЕРСИИ</span>
+          </div>
+          <div class="chart-wrap"><canvas id="ch-leads"></canvas></div>
+        </div>
+        <div class="card">
+          <div class="card-hdr">
+            <div><div class="card-title">CTR & CR, %</div></div>
+            <span class="tag tag-b">ЭФФЕКТИВНОСТЬ</span>
+          </div>
+          <div class="chart-wrap"><canvas id="ch-eff"></canvas></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── TAB: ACCOUNTS ── -->
+    <div id="tab-accounts" style="display:none">
+      <div class="card">
+        <div class="card-hdr">
+          <div><div class="card-title">Итоги по аккаунтам</div><div class="card-sub">За выбранный период</div></div>
+        </div>
+        <div class="tbl-wrap">
+          <table class="dtbl" id="tbl-accounts">
+            <thead><tr>
+              <th onclick="sortTable('tbl-accounts',0)">Аккаунт</th>
+              <th class="n" onclick="sortTable('tbl-accounts',1)">Показы</th>
+              <th class="n" onclick="sortTable('tbl-accounts',2)">Клики</th>
+              <th class="n" onclick="sortTable('tbl-accounts',3)">CTR%</th>
+              <th class="n" onclick="sortTable('tbl-accounts',4)">Расход ₽</th>
+              <th class="n" onclick="sortTable('tbl-accounts',5)">Лиды</th>
+              <th class="n" onclick="sortTable('tbl-accounts',6)">CPL ₽</th>
+              <th class="n" onclick="sortTable('tbl-accounts',7)">CR%</th>
+            </tr></thead>
+            <tbody id="tbody-accounts"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-hdr"><div class="card-title">Расход по аккаунтам</div><span class="tag tag-r">₽</span></div>
+          <div class="chart-wrap"><canvas id="ch-acc-cost"></canvas></div>
+        </div>
+        <div class="card">
+          <div class="card-hdr"><div class="card-title">Лиды по аккаунтам</div><span class="tag tag-g">ЛИДЫ</span></div>
+          <div class="chart-wrap"><canvas id="ch-acc-leads"></canvas></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── TAB: CAMPAIGNS ── -->
+    <div id="tab-campaigns" style="display:none">
+      <div class="card">
+        <div class="card-hdr">
+          <div><div class="card-title">Кампании</div><div class="card-sub">Сортировка по клику на заголовок</div></div>
+        </div>
+        <div class="tbl-wrap">
+          <table class="dtbl" id="tbl-campaigns">
+            <thead><tr>
+              <th onclick="sortTable('tbl-campaigns',0)">Кампания</th>
+              <th onclick="sortTable('tbl-campaigns',1)">Аккаунт</th>
+              <th onclick="sortTable('tbl-campaigns',2)">Сеть</th>
+              <th class="n" onclick="sortTable('tbl-campaigns',3)">Показы</th>
+              <th class="n" onclick="sortTable('tbl-campaigns',4)">Клики</th>
+              <th class="n" onclick="sortTable('tbl-campaigns',5)">CTR%</th>
+              <th class="n" onclick="sortTable('tbl-campaigns',6)">Расход ₽</th>
+              <th class="n" onclick="sortTable('tbl-campaigns',7)">Лиды</th>
+              <th class="n" onclick="sortTable('tbl-campaigns',8)">CPL ₽</th>
+              <th class="n" onclick="sortTable('tbl-campaigns',9)">CR%</th>
+            </tr></thead>
+            <tbody id="tbody-campaigns"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── TAB: NETWORK ── -->
+    <div id="tab-network" style="display:none">
+      <div class="kpi-row" id="net-kpis" style="grid-template-columns:1fr 1fr"></div>
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-hdr"><div class="card-title">Расход: Поиск vs РСЯ</div></div>
+          <div class="chart-wrap"><canvas id="ch-net-cost"></canvas></div>
+        </div>
+        <div class="card">
+          <div class="card-hdr"><div class="card-title">Клики: Поиск vs РСЯ</div></div>
+          <div class="chart-wrap"><canvas id="ch-net-clk"></canvas></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-hdr"><div class="card-title">CTR по типу сети</div></div>
+        <div class="chart-wrap" style="height:160px"><canvas id="ch-net-ctr"></canvas></div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<script>
+// ════════════════════════════
+// STATE
+// ════════════════════════════
+let RAW = [];          // все строки из Sheets
+let FILTERED = [];     // после фильтров
+let currentPeriod = 'day';
+let currentTab = 'overview';
+let charts = {};
+let sortState = {};    // { tableId: { col, dir } }
+
+const ACC_COLORS = ['#c8401a','#1a5fc8','#2da06e','#c8971a','#8b1ac8','#1ac8b8','#c81a8b','#5a8b1a'];
+
+// ════════════════════════════
+// LOAD FROM GOOGLE SHEETS
+// ════════════════════════════
+async function loadSheet() {
+  const sheetId   = document.getElementById('sheet-id').value.trim();
+  const sheetName = document.getElementById('sheet-name').value.trim() || 'data';
+
+  if (!sheetId) { showSetupErr('Введи ID таблицы'); return; }
+
+  // Сохраняем
+  try { localStorage.setItem('yk_sheet_id', sheetId); localStorage.setItem('yk_sheet_name', sheetName); } catch(e) {}
+
+  document.getElementById('setup').style.display = 'none';
+  showLoading('Подключаемся к Google Sheets...');
+
+  try {
+    const url = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(sheetName)}`;
+    const resp = await fetch(url);
+    if (!resp.ok) throw new Error(`HTTP ${resp.status} — проверь ID таблицы и доступ`);
+    const csv = await resp.text();
+
+    showLoading('Парсим данные...');
+    RAW = parseCSV(csv);
+
+    if (!RAW.length) throw new Error('Таблица пустая или лист не найден');
+
+    hideLoading();
+    document.getElementById('app').style.display = 'block';
+    document.getElementById('last-update').textContent = `Обновлено: ${new Date().toLocaleTimeString('ru-RU')}`;
+
+    buildFilters();
+    applyFilters();
+
+  } catch(e) {
+    hideLoading();
+    document.getElementById('setup').style.display = 'flex';
+    showSetupErr('Ошибка: ' + e.message);
+  }
+}
+
+async function reloadData() {
+  const sheetId   = localStorage.getItem('yk_sheet_id') || document.getElementById('sheet-id').value.trim();
+  const sheetName = localStorage.getItem('yk_sheet_name') || 'data';
+  document.getElementById('sheet-id').value = sheetId;
+  document.getElementById('sheet-name').value = sheetName;
+  await loadSheet();
+}
+
+// ════════════════════════════
+// CSV PARSER
+// ════════════════════════════
+function parseCSV(text) {
+  const lines = text.split(/\r?\n/).filter(l => l.trim());
+  if (lines.length < 2) return [];
+
+  // Google gviz/csv оборачивает поля в кавычки при наличии запятых/спецсимволов
+  function parseLine(line) {
+    const result = [];
+    let cur = '', inQ = false;
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i];
+      if (ch === '"') {
+        if (inQ && line[i+1] === '"') { cur += '"'; i++; }
+        else inQ = !inQ;
+      } else if (ch === ',' && !inQ) {
+        result.push(cur); cur = '';
+      } else {
+        cur += ch;
+      }
+    }
+    result.push(cur);
+    return result;
+  }
+
+  const headers = parseLine(lines[0]);
+  const rows = [];
+
+  for (let i = 1; i < lines.length; i++) {
+    const cols = parseLine(lines[i]);
+    const row = {};
+    headers.forEach((h, j) => { row[h.trim()] = (cols[j] || '').trim(); });
+
+    // Парсим числа (запятая как десятичный разделитель)
+    const n = s => {
+      const v = String(s || '').replace(/\s/g,'').replace(',','.');
+      const f = parseFloat(v);
+      return isFinite(f) ? f : 0;
+    };
+
+    rows.push({
+      date:        row['Date']          || '',
+      weekStart:   row['WeekStart']     || '',
+      monthStart:  row['MonthStart']    || '',
+      campaign:    row['CampaignName']  || '',
+      campaignId:  row['CampaignId']    || '',
+      network:     row['AdNetworkType'] || '',
+      impressions: n(row['Impressions']),
+      clicks:      n(row['Clicks']),
+      ctr:         n(row['CTR']),
+      cost:        n(row['Cost']),
+      conversions: n(row['Conversions']),
+      cr:          n(row['CR']),
+      cpl:         n(row['CPL']),
+      account:     row['AccountLogin']  || '',
+      costRaw:     n(row['CostRaw']),
+    });
+  }
+
+  return rows.filter(r => r.date);
+}
+
+// ════════════════════════════
+// FILTERS
+// ════════════════════════════
+function buildFilters() {
+  const accounts  = [...new Set(RAW.map(r => r.account))].sort();
+  const campaigns = [...new Set(RAW.map(r => r.campaign))].sort();
+
+  const fAcc = document.getElementById('f-account');
+  fAcc.innerHTML = '<option value="">Все аккаунты</option>' +
+    accounts.map(a => `<option value="${a}">${a}</option>`).join('');
+
+  const fCamp = document.getElementById('f-campaign');
+  fCamp.innerHTML = '<option value="">Все кампании</option>' +
+    campaigns.map(c => `<option value="${c}">${c}</option>`).join('');
+}
+
+function applyFilters() {
+  const acc     = document.getElementById('f-account').value;
+  const camp    = document.getElementById('f-campaign').value;
+  const network = document.getElementById('f-network').value;
+
+  FILTERED = RAW.filter(r =>
+    (!acc     || r.account  === acc)  &&
+    (!camp    || r.campaign === camp) &&
+    (!network || r.network  === network)
+  );
+
+  renderAll();
+}
+
+// ════════════════════════════
+// PERIOD
+// ════════════════════════════
+function setPeriod(btn) {
+  currentPeriod = btn.dataset.p;
+  document.querySelectorAll('.pill').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  const labels = { day:'По дням', week:'По неделям', month:'По месяцам' };
+  document.getElementById('chart-period-label').textContent = labels[currentPeriod];
+  renderAll();
+}
+
+function periodKey(row) {
+  return { day: row.date, week: row.weekStart, month: row.monthStart }[currentPeriod] || row.date;
+}
+
+// ════════════════════════════
+// AGGREGATE
+// ════════════════════════════
+function aggregateRows(rows) {
+  const g = {};
+  rows.forEach(r => {
+    const k = periodKey(r);
+    if (!g[k]) g[k] = { date:k, impressions:0, clicks:0, cost:0, conversions:0 };
+    g[k].impressions  += r.impressions;
+    g[k].clicks       += r.clicks;
+    g[k].cost         += r.cost;
+    g[k].conversions  += r.conversions;
+  });
+  return Object.values(g)
+    .sort((a,b) => a.date.localeCompare(b.date))
+    .map(r => ({
+      ...r,
+      ctr: r.impressions > 0 ? r.clicks / r.impressions * 100 : 0,
+      cpl: r.conversions > 0 ? r.cost / r.conversions : 0,
+      cr:  r.clicks > 0 ? r.conversions / r.clicks * 100 : 0,
+    }));
+}
+
+function totals(rows) {
+  const t = rows.reduce((a,r) => ({
+    impressions: a.impressions + r.impressions,
+    clicks:      a.clicks      + r.clicks,
+    cost:        a.cost        + r.cost,
+    conversions: a.conversions + r.conversions,
+  }), { impressions:0, clicks:0, cost:0, conversions:0 });
+  return { ...t,
+    ctr: t.impressions > 0 ? t.clicks / t.impressions * 100 : 0,
+    cpl: t.conversions > 0 ? t.cost   / t.conversions       : 0,
+    cr:  t.clicks > 0      ? t.conversions / t.clicks * 100  : 0,
+  };
+}
+
+// ════════════════════════════
+// RENDER ALL
+// ════════════════════════════
+function renderAll() {
+  const t = totals(FILTERED);
+
+  // KPIs
+  document.getElementById('k-imp').textContent  = fmtN(t.impressions);
+  document.getElementById('k-clk').textContent  = fmtN(t.clicks);
+  document.getElementById('k-ctr').textContent  = t.ctr.toFixed(2) + '%';
+  document.getElementById('k-cost').textContent = fmtM(t.cost);
+  document.getElementById('k-conv').textContent = fmtN(t.conversions);
+  document.getElementById('k-cpl').textContent  = t.conversions > 0 ? fmtM(t.cpl) : '—';
+  document.getElementById('k-cr').textContent   = t.cr.toFixed(2) + '%';
+
+  renderOverview();
+  renderAccounts();
+  renderCampaigns();
+  renderNetwork();
+}
+
+// ── OVERVIEW ──
+function renderOverview() {
+  const agg = aggregateRows(FILTERED);
+  const labels = agg.map(r => r.date);
+
+  mkChart('ch-main', {
+    type: 'line',
+    data: { labels, datasets: [
+      { label:'Расход ₽', data: agg.map(r=>r.cost), borderColor:'#c8401a', backgroundColor:'rgba(200,64,26,0.07)', fill:true, tension:0.4, yAxisID:'y', pointRadius: agg.length>60?0:2.5 },
+      { label:'Клики',    data: agg.map(r=>r.clicks), borderColor:'#1a5fc8', backgroundColor:'transparent', tension:0.4, yAxisID:'y1', pointRadius: agg.length>60?0:2.5 },
+    ]},
+    options: copts({ dual:true, l0:'₽', l1:'' }),
+  });
+
+  mkChart('ch-leads', {
+    type: 'bar',
+    data: { labels, datasets: [
+      { label:'Лиды', data: agg.map(r=>r.conversions), backgroundColor:'rgba(45,160,110,0.6)', borderColor:'#2da06e', borderWidth:1, yAxisID:'y' },
+      { label:'CPL ₽', data: agg.map(r=>r.cpl), borderColor:'#c8971a', backgroundColor:'transparent', type:'line', tension:0.4, yAxisID:'y1', pointRadius:0 },
+    ]},
+    options: copts({ dual:true, l0:'', l1:'₽' }),
+  });
+
+  mkChart('ch-eff', {
+    type: 'line',
+    data: { labels, datasets: [
+      { label:'CTR %', data: agg.map(r=>r.ctr.toFixed(3)), borderColor:'#1a5fc8', backgroundColor:'rgba(26,95,200,0.07)', fill:true, tension:0.4, pointRadius:0 },
+      { label:'CR %',  data: agg.map(r=>r.cr.toFixed(3)),  borderColor:'#2da06e', backgroundColor:'transparent', tension:0.4, yAxisID:'y1', pointRadius:0 },
+    ]},
+    options: copts({ dual:true, l0:'%', l1:'%' }),
+  });
+}
+
+// ── ACCOUNTS ──
+function renderAccounts() {
+  const accMap = {};
+  FILTERED.forEach(r => {
+    if (!accMap[r.account]) accMap[r.account] = { account:r.account, impressions:0, clicks:0, cost:0, conversions:0 };
+    accMap[r.account].impressions  += r.impressions;
+    accMap[r.account].clicks       += r.clicks;
+    accMap[r.account].cost         += r.cost;
+    accMap[r.account].conversions  += r.conversions;
+  });
+
+  const accs = Object.values(accMap).map(a => ({
+    ...a,
+    ctr: a.impressions > 0 ? a.clicks / a.impressions * 100 : 0,
+    cpl: a.conversions > 0 ? a.cost   / a.conversions       : 0,
+    cr:  a.clicks > 0      ? a.conversions / a.clicks * 100  : 0,
+  })).sort((a,b) => b.cost - a.cost);
+
+  const t = totals(FILTERED);
+  const tbody = document.getElementById('tbody-accounts');
+  tbody.innerHTML = accs.map((a,i) => `
+    <tr>
+      <td><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${ACC_COLORS[i%ACC_COLORS.length]};margin-right:6px"></span>${a.account}</td>
+      <td class="n">${fmtN(a.impressions)}</td>
+      <td class="n">${fmtN(a.clicks)}</td>
+      <td class="n">${a.ctr.toFixed(2)}%</td>
+      <td class="n">${fmtM(a.cost)}</td>
+      <td class="n">${fmtN(a.conversions)}</td>
+      <td class="n">${a.conversions>0?fmtM(a.cpl):'—'}</td>
+      <td class="n">${a.cr.toFixed(2)}%</td>
+    </tr>
+  `).join('') + `
+    <tr class="total-row">
+      <td>Итого</td>
+      <td class="n">${fmtN(t.impressions)}</td>
+      <td class="n">${fmtN(t.clicks)}</td>
+      <td class="n">${t.ctr.toFixed(2)}%</td>
+      <td class="n">${fmtM(t.cost)}</td>
+      <td class="n">${fmtN(t.conversions)}</td>
+      <td class="n">${t.conversions>0?fmtM(t.cpl):'—'}</td>
+      <td class="n">${t.cr.toFixed(2)}%</td>
+    </tr>`;
+
+  mkChart('ch-acc-cost', {
+    type: 'bar',
+    data: { labels: accs.map(a=>a.account), datasets: [{
+      label: 'Расход ₽',
+      data: accs.map(a=>a.cost),
+      backgroundColor: accs.map((_,i) => ACC_COLORS[i%ACC_COLORS.length]+'99'),
+      borderColor:     accs.map((_,i) => ACC_COLORS[i%ACC_COLORS.length]),
+      borderWidth: 1,
+    }]},
+    options: copts({ l0:'₽' }),
+  });
+
+  mkChart('ch-acc-leads', {
+    type: 'bar',
+    data: { labels: accs.map(a=>a.account), datasets: [{
+      label: 'Лиды',
+      data: accs.map(a=>a.conversions),
+      backgroundColor: accs.map((_,i) => ACC_COLORS[i%ACC_COLORS.length]+'99'),
+      borderColor:     accs.map((_,i) => ACC_COLORS[i%ACC_COLORS.length]),
+      borderWidth: 1,
+    }]},
+    options: copts({ l0:'' }),
+  });
+}
+
+// ── CAMPAIGNS ──
+function renderCampaigns() {
+  const campMap = {};
+  FILTERED.forEach(r => {
+    const k = r.campaign + '||' + r.account + '||' + r.network;
+    if (!campMap[k]) campMap[k] = { campaign:r.campaign, account:r.account, network:r.network, impressions:0, clicks:0, cost:0, conversions:0 };
+    campMap[k].impressions  += r.impressions;
+    campMap[k].clicks       += r.clicks;
+    campMap[k].cost         += r.cost;
+    campMap[k].conversions  += r.conversions;
+  });
+
+  const camps = Object.values(campMap).map(c => ({
+    ...c,
+    ctr: c.impressions > 0 ? c.clicks / c.impressions * 100 : 0,
+    cpl: c.conversions > 0 ? c.cost   / c.conversions       : 0,
+    cr:  c.clicks > 0      ? c.conversions / c.clicks * 100  : 0,
+  })).sort((a,b) => b.cost - a.cost);
+
+  const netBadge = n => n === 'SEARCH'
+    ? '<span class="net-badge net-search">Поиск</span>'
+    : '<span class="net-badge net-rsya">РСЯ</span>';
+
+  document.getElementById('tbody-campaigns').innerHTML = camps.map(c => `
+    <tr>
+      <td>${c.campaign}</td>
+      <td style="color:var(--muted);font-size:11px">${c.account}</td>
+      <td>${netBadge(c.network)}</td>
+      <td class="n">${fmtN(c.impressions)}</td>
+      <td class="n">${fmtN(c.clicks)}</td>
+      <td class="n">${c.ctr.toFixed(2)}%</td>
+      <td class="n">${fmtM(c.cost)}</td>
+      <td class="n">${fmtN(c.conversions)}</td>
+      <td class="n">${c.conversions>0?fmtM(c.cpl):'—'}</td>
+      <td class="n">${c.cr.toFixed(2)}%</td>
+    </tr>
+  `).join('');
+}
+
+// ── NETWORK ──
+function renderNetwork() {
+  const search = FILTERED.filter(r => r.network === 'SEARCH');
+  const rsya   = FILTERED.filter(r => r.network === 'AD_NETWORK');
+  const ts = totals(search), tr = totals(rsya);
+
+  document.getElementById('net-kpis').innerHTML = `
+    <div class="kpi" style="border-top:3px solid var(--accent2)">
+      <div class="kpi-label">🔍 Поиск — расход</div>
+      <div class="kpi-val c2">${fmtM(ts.cost)}</div>
+      <div class="kpi-sub">CTR ${ts.ctr.toFixed(2)}% · CR ${ts.cr.toFixed(2)}% · CPL ${ts.conversions>0?fmtM(ts.cpl):'—'}</div>
+    </div>
+    <div class="kpi" style="border-top:3px solid var(--accent3)">
+      <div class="kpi-label">📢 РСЯ — расход</div>
+      <div class="kpi-val c3">${fmtM(tr.cost)}</div>
+      <div class="kpi-sub">CTR ${tr.ctr.toFixed(2)}% · CR ${tr.cr.toFixed(2)}% · CPL ${tr.conversions>0?fmtM(tr.cpl):'—'}</div>
+    </div>`;
+
+  const aggS = aggregateRows(search);
+  const aggR = aggregateRows(rsya);
+  const allDates = [...new Set([...aggS.map(r=>r.date), ...aggR.map(r=>r.date)])].sort();
+  const byDate = (agg, d) => agg.find(r=>r.date===d);
+
+  mkChart('ch-net-cost', {
+    type: 'line',
+    data: { labels: allDates, datasets: [
+      { label:'Поиск ₽', data: allDates.map(d=>byDate(aggS,d)?.cost||0), borderColor:'#1a5fc8', backgroundColor:'rgba(26,95,200,0.07)', fill:true, tension:0.4, pointRadius:0 },
+      { label:'РСЯ ₽',   data: allDates.map(d=>byDate(aggR,d)?.cost||0), borderColor:'#2da06e', backgroundColor:'rgba(45,160,110,0.07)', fill:true, tension:0.4, pointRadius:0 },
+    ]},
+    options: copts({ l0:'₽' }),
+  });
+
+  mkChart('ch-net-clk', {
+    type: 'line',
+    data: { labels: allDates, datasets: [
+      { label:'Поиск', data: allDates.map(d=>byDate(aggS,d)?.clicks||0), borderColor:'#1a5fc8', backgroundColor:'rgba(26,95,200,0.07)', fill:true, tension:0.4, pointRadius:0 },
+      { label:'РСЯ',   data: allDates.map(d=>byDate(aggR,d)?.clicks||0), borderColor:'#2da06e', backgroundColor:'rgba(45,160,110,0.07)', fill:true, tension:0.4, pointRadius:0 },
+    ]},
+    options: copts({ l0:'' }),
+  });
+
+  mkChart('ch-net-ctr', {
+    type: 'bar',
+    data: { labels: ['Поиск', 'РСЯ'], datasets: [
+      { label:'CTR %',    data: [ts.ctr, tr.ctr],   backgroundColor:['rgba(26,95,200,0.7)','rgba(45,160,110,0.7)'] },
+      { label:'CR %',     data: [ts.cr,  tr.cr],    backgroundColor:['rgba(26,95,200,0.4)','rgba(45,160,110,0.4)'] },
+    ]},
+    options: copts({ l0:'%' }),
+  });
+}
+
+// ════════════════════════════
+// CHART HELPERS
+// ════════════════════════════
+function mkChart(id, config) {
+  if (charts[id]) { charts[id].destroy(); }
+  const el = document.getElementById(id);
+  if (!el) return;
+  charts[id] = new Chart(el.getContext('2d'), config);
+}
+
+function copts({ dual=false, l0='', l1='' } = {}) {
+  const tick = v => l0==='₽' ? '₽'+fmtC(v) : fmtC(v)+l0;
+  const tick1 = v => l1==='₽' ? '₽'+fmtC(v) : fmtC(v)+l1;
+  const base = {
+    responsive: true, maintainAspectRatio: false,
+    interaction: { mode:'index', intersect:false },
+    plugins: {
+      legend: { labels:{ color:'#8a8478', font:{family:'JetBrains Mono',size:11}, boxWidth:12 } },
+      tooltip: { backgroundColor:'#fff', borderColor:'#e0dbd0', borderWidth:1, titleColor:'#1a1814', bodyColor:'#8a8478', titleFont:{family:'Unbounded',size:10}, bodyFont:{family:'JetBrains Mono',size:11} },
+    },
+    scales: {
+      x: { grid:{color:'rgba(224,219,208,0.5)'}, ticks:{color:'#8a8478', font:{family:'JetBrains Mono',size:10}, maxTicksLimit:10, maxRotation:30} },
+      y: { grid:{color:'rgba(224,219,208,0.5)'}, ticks:{color:'#8a8478', font:{family:'JetBrains Mono',size:10}, callback:tick} }
+    }
+  };
+  if (dual) base.scales.y1 = {
+    position:'right', grid:{drawOnChartArea:false},
+    ticks:{color:'#8a8478', font:{family:'JetBrains Mono',size:10}, callback:tick1}
+  };
+  return base;
+}
+
+// ════════════════════════════
+// TABLE SORT
+// ════════════════════════════
+function sortTable(tblId, colIdx) {
+  const tbl = document.getElementById(tblId);
+  const tbody = tbl.querySelector('tbody');
+  const rows = [...tbody.querySelectorAll('tr:not(.total-row)')];
+  const totalRow = tbody.querySelector('.total-row');
+
+  const prev = sortState[tblId] || { col:-1, dir:1 };
+  const dir = prev.col === colIdx ? -prev.dir : -1;
+  sortState[tblId] = { col: colIdx, dir };
+
+  tbl.querySelectorAll('th').forEach((th,i) => {
+    th.classList.remove('sort-asc','sort-desc');
+    if (i === colIdx) th.classList.add(dir === -1 ? 'sort-desc' : 'sort-asc');
+  });
+
+  rows.sort((a,b) => {
+    const av = a.cells[colIdx]?.textContent.replace(/[₽\s%]/g,'').replace(',','.') || '';
+    const bv = b.cells[colIdx]?.textContent.replace(/[₽\s%]/g,'').replace(',','.') || '';
+    const an = parseFloat(av), bn = parseFloat(bv);
+    if (!isNaN(an) && !isNaN(bn)) return dir * (bn - an);
+    return dir * bv.localeCompare(av, 'ru');
+  });
+
+  rows.forEach(r => tbody.appendChild(r));
+  if (totalRow) tbody.appendChild(totalRow);
+}
+
+// ════════════════════════════
+// TABS
+// ════════════════════════════
+function switchTab(tab, btn) {
+  currentTab = tab;
+  ['overview','accounts','campaigns','network'].forEach(t => {
+    document.getElementById('tab-'+t).style.display = t===tab ? 'block' : 'none';
+  });
+  document.querySelectorAll('.tab').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+}
+
+// ════════════════════════════
+// EXPORT
+// ════════════════════════════
+function exportCSV() {
+  const header = 'Дата,Аккаунт,Кампания,Сеть,Показы,Клики,CTR%,Расход,Лиды,CPL,CR%\n';
+  const rows = FILTERED.map(r =>
+    `${periodKey(r)},${r.account},${r.campaign},${r.network},${r.impressions},${r.clicks},${r.ctr.toFixed(2)},${r.cost.toFixed(2)},${r.conversions},${r.cpl.toFixed(2)},${r.cr.toFixed(2)}`
+  ).join('\n');
+  const blob = new Blob(['\uFEFF'+header+rows], { type:'text/csv;charset=utf-8;' });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+  a.download = `direct_${new Date().toISOString().split('T')[0]}.csv`; a.click();
+}
+
+// ════════════════════════════
+// FORMAT
+// ════════════════════════════
+function fmtN(n) { return Math.round(n).toLocaleString('ru-RU'); }
+function fmtM(n) {
+  if (n >= 1e6) return (n/1e6).toFixed(1)+' млн ₽';
+  if (n >= 1e3) return (n/1e3).toFixed(1)+' тыс ₽';
+  return Math.round(n).toLocaleString('ru-RU')+' ₽';
+}
+function fmtC(n) {
+  if (n >= 1e6) return (n/1e6).toFixed(1)+'M';
+  if (n >= 1e3) return (n/1e3).toFixed(0)+'K';
+  return Math.round(n);
+}
+
+// ════════════════════════════
+// LOADING / ERROR
+// ════════════════════════════
+function showLoading(msg) {
+  document.getElementById('loading-text').textContent = msg || 'Загружаем...';
+  document.getElementById('loading').style.display = 'flex';
+}
+function hideLoading() { document.getElementById('loading').style.display = 'none'; }
+function showSetupErr(msg) {
+  const el = document.getElementById('setup-err');
+  el.textContent = msg; el.classList.add('show');
+}
+
+// ════════════════════════════
+// INIT
+// ════════════════════════════
+(function init() {
+  const savedId   = localStorage.getItem('yk_sheet_id');
+  const savedName = localStorage.getItem('yk_sheet_name');
+  if (savedId)   document.getElementById('sheet-id').value   = savedId;
+  if (savedName) document.getElementById('sheet-name').value = savedName;
+
+  // Автозагрузка если ID уже сохранён
+  if (savedId) loadSheet();
+})();
+</script>
+</body>
+</html>
